@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
+#define GLM_FORCE_CXX03 //This alongside disabling language extensions stops a bunch of L4 warnings about GLM
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/vec4.hpp>
@@ -77,9 +78,13 @@ static const char *getVulkanResultString(VkResult result)
 	return "VK_<Unknown>";
 }
 
-int main() 
+int main(int, char*[]) 
 {
 	//glfwInit();
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+
+	SDL_Window* window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN);
+
 
 	//glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	//GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
@@ -93,13 +98,38 @@ int main()
 	glm::vec4 vec;
 	auto test = matrix * vec;
 
-	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
+	bool go = true;
+	while (go) 
+	{
+		SDL_Event e;
+		while (SDL_PollEvent(&e))
+		{
+			switch (e.type)
+			{
+			case SDL_QUIT:
+				go = false;
+				break;
+
+			case SDL_KEYUP:
+
+				switch (e.key.keysym.sym)
+				{
+				case SDLK_ESCAPE:
+					go = false;
+					break;
+				}
+				break;
+
+			case SDL_KEYDOWN:
+				
+				break;
+
+			}
+		}
 	}
 
-	glfwDestroyWindow(window);
-
-	glfwTerminate();
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 
 	return 0;
 }
