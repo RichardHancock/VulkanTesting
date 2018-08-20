@@ -3,17 +3,18 @@
 
 #include <vulkan/vulkan.h>
 
+/*
 #define GLM_FORCE_CXX03 //This alongside disabling language extensions stops a bunch of L4 warnings about GLM
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
-
+*/
 #include <iostream>
 #include <string>
 
 
-static const char *getVulkanResultString(VkResult result)
+static const char* getVulkanResultString(VkResult result)
 {
 	switch ((int)result)
 	{
@@ -78,12 +79,76 @@ static const char *getVulkanResultString(VkResult result)
 	return "VK_<Unknown>";
 }
 
+
+class App
+{
+public:
+	void start()
+	{
+		init();
+		mainLoop();
+		cleanUp();
+	}
+
+	const int WIDTH = 800;
+	const int HEIGHT = 600;
+
+private:
+
+	SDL_Window* window;
+
+	void init()
+	{
+		SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+
+		window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
+	}
+
+	void mainLoop()
+	{
+		bool go = true;
+		while (go)
+		{
+			SDL_Event e;
+			while (SDL_PollEvent(&e))
+			{
+				switch (e.type)
+				{
+				case SDL_QUIT:
+					go = false;
+					break;
+
+				case SDL_KEYUP:
+
+					switch (e.key.keysym.sym)
+					{
+					case SDLK_ESCAPE:
+						go = false;
+						break;
+					}
+					break;
+
+				case SDL_KEYDOWN:
+
+					break;
+
+				}
+			}
+		}
+	}
+
+	void cleanUp()
+	{
+		SDL_DestroyWindow(window);
+		SDL_Quit();
+	}
+};
+
+
 int main(int, char*[]) 
 {
 	//glfwInit();
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-
-	SDL_Window* window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_VULKAN);
+	
 
 
 	//glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -94,42 +159,20 @@ int main(int, char*[])
 
 	std::cout << extensionCount << " extensions supported" << std::endl;
 
-	glm::mat4 matrix;
-	glm::vec4 vec;
-	auto test = matrix * vec;
+	
+	
 
-	bool go = true;
-	while (go) 
-	{
-		SDL_Event e;
-		while (SDL_PollEvent(&e))
-		{
-			switch (e.type)
-			{
-			case SDL_QUIT:
-				go = false;
-				break;
+	
 
-			case SDL_KEYUP:
+	App app;
 
-				switch (e.key.keysym.sym)
-				{
-				case SDLK_ESCAPE:
-					go = false;
-					break;
-				}
-				break;
-
-			case SDL_KEYDOWN:
-				
-				break;
-
-			}
-		}
+	try {
+		app.start();
+	}
+	catch (const std::exception& e) {
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
 	}
 
-	SDL_DestroyWindow(window);
-	SDL_Quit();
-
-	return 0;
+	return EXIT_SUCCESS;
 }
