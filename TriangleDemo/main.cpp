@@ -95,6 +95,15 @@ public:
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
 
+
+	const std::vector<const char*> validationLayers = {"VK_LAYER_LUNARG_standard_validation"};
+
+#ifdef NDEBUG
+	const bool enableValidationLayers = false;
+#else
+	const bool enableValidationLayers = true;
+#endif
+
 private:
 
 	SDL_Window* window;
@@ -112,6 +121,13 @@ private:
 
 	void createInstance()
 	{
+		//Only for debug builds
+		if (enableValidationLayers && !checkValidationLayerSupport())
+		{
+			throw std::runtime_error("Requested Validation Layers Not Available");
+		}
+
+
 		std::cout << "Creating Vulkan Instance:" << std::endl;
 
 		listAvailableVulkanExts();
@@ -167,10 +183,18 @@ private:
 		createInfo.enabledExtensionCount = extensionCount;
 		createInfo.ppEnabledExtensionNames = extensionNames;
 		createInfo.flags = 0;
-
-		createInfo.enabledLayerCount = 0;
-		createInfo.ppEnabledLayerNames = nullptr;
 		createInfo.pNext = nullptr;
+
+		if (enableValidationLayers) 
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else 
+		{
+			createInfo.enabledLayerCount = 0;
+		}
+		
 
 		VkResult result = vkCreateInstance(&createInfo, nullptr, &vulkanInst);
 		if (result != VK_SUCCESS)
@@ -183,6 +207,49 @@ private:
 		free(extensionNames);
 
 		std::cout << "Create Instance Successful" << std::endl;
+	}
+
+	bool checkValidationLayerSupport()
+	{
+		uint32_t layerCount = 0;
+		
+		VkResult result = vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "vkEnumerateInstanceLayer failed, VkResult Code: " << getVulkanResultString(result) << std::endl;
+			return false;
+		}
+
+		std::vector<VkLayerProperties> availableLayers(layerCount);
+		result = vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "vkEnumerateInstanceLayer failed, VkResult Code: " << getVulkanResultString(result) << std::endl;
+			return false;
+		}
+
+
+		//Looks if all requested layers are available
+		for (const char* layerName : validationLayers) 
+		{
+			bool layerFound = false;
+
+			for (const auto& layerProperties : availableLayers) 
+			{
+				if (strcmp(layerName, layerProperties.layerName) == 0) 
+				{
+					layerFound = true;
+					break;
+				}
+			}
+
+			if (!layerFound) 
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	void listAvailableVulkanExts()
