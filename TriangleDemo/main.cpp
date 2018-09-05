@@ -109,6 +109,8 @@ private:
 	SDL_Window* window;
 
 	VkInstance vulkanInst;
+	VkDebugUtilsMessengerEXT callback;
+
 	
 	void init()
 	{
@@ -117,6 +119,60 @@ private:
 		window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
 
 		createInstance();
+		setupDebugCallback();
+	}
+
+	std::vector<const char*> getRequiredExt()
+	{
+		//SDL Vulkan Specific
+		unsigned int extensionCount;
+
+		//Get required Extension Count for the current platform
+		if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, NULL))
+		{
+			std::cout << " - SDL Error: Couldn't fetch number of required extensions" << std::endl;
+		}
+
+		//Other Extensions we need, mostly just going to be for debug purposes
+
+
+
+		//Allocate Memory for names of these extensions 
+		const char** extensionNames = (const char**)malloc(sizeof(const char*) * extensionCount);
+		if (extensionNames == nullptr)
+		{
+			std::cout << " - Failed to malloc space for the extension names array" << std::endl;
+		}
+
+		//Get the names of the extensions
+		if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensionNames))
+		{
+			std::cout << " - SDL Error: Couldn't fetch names of required extensions" << std::endl;
+		}
+
+
+		
+
+		std::vector<const char*> extensions(extensionNames, extensionNames + extensionCount);
+		
+		//Clear up malloc'd memory
+		free(extensionNames);
+
+		//Enable Debug Callback Functions
+		if (enableValidationLayers)
+			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+		std::cout << " - Required Extension Count: " << extensions.size() << std::endl;
+		std::cout << " - Extension Names:" << std::endl;
+
+
+		for (unsigned int i = 0; i < extensions.size(); i++)
+		{
+			std::cout << "   - " << extensions[i] << std::endl;
+		}
+
+
+		return extensions;
 	}
 
 	void createInstance()
@@ -143,45 +199,14 @@ private:
 		appInfo.pNext = nullptr;
 
 
-		//SDL Vulkan Specific
-		unsigned int extensionCount;
-		
-		//Get required Extension Count for the current platform
-		if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, NULL))
-		{
-			std::cout << " - SDL Error: Couldn't fetch number of required extensions" << std::endl;
-		}
-
-		//Allocate Memory for names of these extensions 
-		const char** extensionNames = (const char**)malloc(sizeof(const char*) * extensionCount);
-		if (extensionNames == nullptr)
-		{
-			std::cout << " - Failed to malloc space for the extension names array" << std::endl;
-		}
-
-		//Get the names of the extensions
-		if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensionNames))
-		{
-			std::cout << " - SDL Error: Couldn't fetch names of required extensions" << std::endl;
-		}
-
-
-		std::cout << " - Required Extension Count: " << extensionCount << std::endl;
-		std::cout << " - Extension Names:" << std::endl;
-
-		for (unsigned int i = 0; i < extensionCount; i++)
-		{
-			std::cout << "   - " << extensionNames[i] << std::endl;
-		}
-		
-
+		std::vector<const char*> extensions = getRequiredExt();
 
 		VkInstanceCreateInfo createInfo;
 
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
-		createInfo.enabledExtensionCount = extensionCount;
-		createInfo.ppEnabledExtensionNames = extensionNames;
+		createInfo.enabledExtensionCount = (uint32_t)extensions.size();
+		createInfo.ppEnabledExtensionNames = extensions.data();
 		createInfo.flags = 0;
 		createInfo.pNext = nullptr;
 
@@ -203,8 +228,7 @@ private:
 			throw std::runtime_error("Failed to create instance!");
 		}
 
-		//Clear up malloc'd memory
-		free(extensionNames);
+		
 
 		std::cout << "Create Instance Successful" << std::endl;
 	}
@@ -270,6 +294,66 @@ private:
 		}
 	}
 
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+		VkDebugUtilsMessageSeverityFlagBitsEXT /*messageSeverity*/,
+		VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* /*pUserData*/)
+	{
+
+		std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+
+		return VK_FALSE;
+	}
+
+	void setupDebugCallback() 
+	{
+		if (!enableValidationLayers) 
+			return;
+
+		VkDebugUtilsMessengerCreateInfoEXT createInfo;
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		createInfo.pfnUserCallback = debugCallback;
+		createInfo.pUserData = nullptr;
+		createInfo.flags = 0; //Needs to be set due to Vulkan Spec
+
+		
+		if (CreateDebugUtilsMessengerEXT(vulkanInst, &createInfo, nullptr, &callback) != VK_SUCCESS) 
+			throw std::runtime_error("failed to set up debug callback!");
+		
+	}
+
+	VkResult CreateDebugUtilsMessengerEXT(
+		VkInstance instance, 
+		const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, 
+		const VkAllocationCallbacks* pAllocator, 
+		VkDebugUtilsMessengerEXT* pCallback) 
+	{
+		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+		if (func != nullptr) 
+		{
+			return func(instance, pCreateInfo, pAllocator, pCallback);
+		}
+		else 
+		{
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
+		}
+	}
+
+	static void DestroyDebugUtilsMessengerEXT(
+		VkInstance instance, 
+		VkDebugUtilsMessengerEXT callback, 
+		const VkAllocationCallbacks* pAllocator) 
+	{
+		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (func != nullptr) 
+			func(instance, callback, pAllocator);
+		
+	}
+
+
 	void mainLoop()
 	{
 		bool go = true;
@@ -315,6 +399,9 @@ private:
 
 	void cleanUp()
 	{
+		if (enableValidationLayers)
+			DestroyDebugUtilsMessengerEXT(vulkanInst, callback, nullptr);
+
 		vkDestroyInstance(vulkanInst, nullptr);
 
 		SDL_DestroyWindow(window);
