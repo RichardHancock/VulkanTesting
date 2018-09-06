@@ -111,16 +111,7 @@ private:
 	VkInstance vulkanInst;
 	VkDebugUtilsMessengerEXT callback;
 
-	
-	void init()
-	{
-		SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-
-		window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
-
-		createInstance();
-		setupDebugCallback();
-	}
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
 	std::vector<const char*> getRequiredExt()
 	{
@@ -353,6 +344,62 @@ private:
 		
 	}
 
+
+	void selectPhysicalDevice()
+	{
+		uint32_t deviceCount = 0;
+		VkResult result = vkEnumeratePhysicalDevices(vulkanInst, &deviceCount, nullptr);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << " - Create Instance Failed, VkResult Code: " << getVulkanResultString(result) << std::endl;
+			throw std::runtime_error("Failed to create instance!");
+		}
+
+		if (deviceCount == 0)
+			throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		
+		std::vector<VkPhysicalDevice> devices(deviceCount);
+		VkResult result = vkEnumeratePhysicalDevices(vulkanInst, &deviceCount, devices.data());
+		if (result != VK_SUCCESS)
+		{
+			std::cout << " - Create Instance Failed, VkResult Code: " << getVulkanResultString(result) << std::endl;
+			throw std::runtime_error("Failed to create instance!");
+		}
+
+
+		for (const auto& device : devices) {
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device;
+				break;
+			}
+		}
+
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+	}
+
+	bool isDeviceSuitable(VkPhysicalDevice device) 
+	{
+		VkPhysicalDeviceProperties deviceProperties;
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceProperties(device, &deviceProperties);
+		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+			deviceFeatures.geometryShader;
+	}
+
+	void init()
+	{
+		SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+
+		window = SDL_CreateWindow("Vulkan Testing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
+
+		createInstance();
+		setupDebugCallback();
+		selectPhysicalDevice();
+	}
 
 	void mainLoop()
 	{
