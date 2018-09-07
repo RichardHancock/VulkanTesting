@@ -359,7 +359,7 @@ private:
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
 		
 		std::vector<VkPhysicalDevice> devices(deviceCount);
-		VkResult result = vkEnumeratePhysicalDevices(vulkanInst, &deviceCount, devices.data());
+		result = vkEnumeratePhysicalDevices(vulkanInst, &deviceCount, devices.data());
 		if (result != VK_SUCCESS)
 		{
 			std::cout << " - Create Instance Failed, VkResult Code: " << getVulkanResultString(result) << std::endl;
@@ -369,6 +369,7 @@ private:
 
 		for (const auto& device : devices) {
 			if (isDeviceSuitable(device)) {
+				std::cout << "Device Good" << std::endl;
 				physicalDevice = device;
 				break;
 			}
@@ -386,8 +387,46 @@ private:
 		vkGetPhysicalDeviceProperties(device, &deviceProperties);
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
+		//TODO add full print out of device capabilities (Also will need to check for proper NVidia GPU rather than Intel Integrated, unless discrete_gpu flag handles this
 		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-			deviceFeatures.geometryShader;
+			deviceFeatures.geometryShader &&
+			findQueueFamilies(device).isComplete();
+	}
+
+	struct QueueFamilyIndices 
+	{
+		int graphicsFamily = -1;
+
+		bool isComplete()
+		{
+			return graphicsFamily >= 0;
+		}
+	};
+
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+	{
+		QueueFamilyIndices result;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies)
+		{
+			if (queueFamily.queueCount > 0 &&
+				queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				result.graphicsFamily = i;
+			}
+
+			if (result.isComplete())
+				break;
+		}
+
+		return result;
 	}
 
 	void init()
